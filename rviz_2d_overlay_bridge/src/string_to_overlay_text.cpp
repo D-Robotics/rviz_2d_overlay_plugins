@@ -1,11 +1,3 @@
-// publishes rviz_2d_overlay_msgs/msg/OverlayText from std_msgs/msg/String
-
-// test with:
-// ros2 topic pub /chatter std_msgs/String "data: Hello world"
-// ros2 run rviz_2d_overlay_plugins string_to_overlay_text
-// ros2 run rviz_2d_overlay_plugins string_to_overlay_text --ros-args -p string_topic:=chatter -p fg_color:=r
-// ros2 launch rviz_2d_overlay_plugins string_to_overlay_text_example.launch.py
-
 #include <iostream>
 #include <vector>
 #include "rclcpp/rclcpp.hpp"
@@ -13,7 +5,6 @@
 #include "std_msgs/msg/string.hpp"
 #include "rcl_interfaces/msg/set_parameters_result.hpp"
 #include "diagnostic_msgs/msg/diagnostic_array.hpp"
-
 
 using namespace std::chrono_literals;
 using std::placeholders::_1;
@@ -49,17 +40,17 @@ public:
         this->declare_parameter<std::string>("fg_color", "");
         this->get_parameter("string_topic", string_topic);
         this->get_parameter("fg_color", fg_color);
-        if (string_topic == "")
-        {
-            RCLCPP_ERROR_STREAM(this->get_logger(), "Parameter string_topic not set");
-            string_topic = "/chatter";   
-        }
-        overlay_text_topic = string_topic + "_overlay_text";
+        // if (string_topic == "")
+        // {
+        //     RCLCPP_ERROR_STREAM(this->get_logger(), "Parameter string_topic not set");
+        //     string_topic = "/chatter";   
+        // }
+        overlay_text_topic = diag_topic_name_ + "_overlay_text";
 
         RCLCPP_WARN(this->get_logger(),
-            "\n string_topic: %s" \
-            "\n diag_topic_name: %s" \
-            "\n overlay_text_topic: %s",
+            "\n\t       string_topic: %s" \
+            "\n\t    diag_topic_name: %s" \
+            "\n\t overlay_text_topic: %s",
             string_topic.data(),
             diag_topic_name_.data(),
             overlay_text_topic.data());
@@ -111,14 +102,18 @@ public:
         ov_msg_.width = 200;
         ov_msg_.height = 40;
 
-        
-        diag_sub_ = this->create_subscription<diagnostic_msgs::msg::DiagnosticArray>(
+        if (!diag_topic_name_.empty()) {
+          diag_sub_ = this->create_subscription<diagnostic_msgs::msg::DiagnosticArray>(
             diag_topic_name_, 2, std::bind(&Rviz2dString::diagCallback, this, _1));
-
-        sub_st_ = this->create_subscription<std_msgs::msg::String>(string_topic, 10, std::bind(&Rviz2dString::strCallback, this, _1));
+        }
+        if (!string_topic.empty()) {
+          sub_st_ = this->create_subscription<std_msgs::msg::String>(
+            string_topic, 10, std::bind(&Rviz2dString::strCallback, this, _1));
+        }
         pub_ov_ = this->create_publisher<rviz_2d_overlay_msgs::msg::OverlayText>(overlay_text_topic, 1);
         callback_handle_ = this->add_on_set_parameters_callback(std::bind(&Rviz2dString::parametersCallback, this, std::placeholders::_1));
-        RCLCPP_INFO_STREAM(this->get_logger(), "Node started: " << this->get_name() << " subscribed: " << string_topic << " publishing: " << overlay_text_topic << " ");
+        // RCLCPP_INFO_STREAM(this->get_logger(),
+        //   "Node started: " << this->get_name() << " subscribed: " << string_topic << " publishing: " << overlay_text_topic << " ");
     }
 
 private:
@@ -128,7 +123,7 @@ private:
     rviz_2d_overlay_msgs::msg::OverlayText ov_msg_;
 
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_st_;
-    std::string string_topic, overlay_text_topic, fg_color;
+    std::string string_topic = "", overlay_text_topic, fg_color = "r";
     rclcpp::Publisher<rviz_2d_overlay_msgs::msg::OverlayText>::SharedPtr pub_ov_;
     OnSetParametersCallbackHandle::SharedPtr callback_handle_;
     
