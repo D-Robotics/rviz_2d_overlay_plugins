@@ -27,5 +27,6 @@ int32 line_width
 float32 text_size
 string font
 std_msgs/ColorRGBA fg_color
+float32 text_cache_size
 
 string text

@@ -10,6 +10,7 @@ find_package(rviz_common REQUIRED)
 find_package(rviz_rendering REQUIRED)
 find_package(rviz_ogre_vendor REQUIRED)
 find_package(std_msgs REQUIRED)
+find_package(diagnostic_msgs REQUIRED)
 
 set(
         headers_to_moc
@@ -32,6 +33,7 @@ add_executable(string_to_overlay_text src/string_to_overlay_text.cpp)
 target_link_libraries(string_to_overlay_text
         rclcpp::rclcpp
         ${std_msgs_TARGETS}
+        ${diagnostic_msgs_TARGETS}
         ${rviz_2d_overlay_msgs_TARGETS}
 )
 

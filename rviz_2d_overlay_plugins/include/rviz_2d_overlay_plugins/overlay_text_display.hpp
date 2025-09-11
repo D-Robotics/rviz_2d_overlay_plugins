@@ -51,6 +51,7 @@
 
     #include "overlay_utils.hpp"
 #endif
+#include <list>
 
 namespace rviz_2d_overlay_plugins {
     class OverlayTextDisplay : public rviz_common::RosTopicDisplay<rviz_2d_overlay_msgs::msg::OverlayText> {
@@ -74,13 +75,17 @@ namespace rviz_2d_overlay_plugins {
         QColor fg_color_;
         int text_size_;
         int line_width_;
-        std::string text_;
+        std::mutex text_cache_mutex_;
+        int text_cache_size_ = 15;
+        std::list<std::string> text_cache_;
+        builtin_interfaces::msg::Time current_ts_;
         QStringList font_families_;
         std::string font_;
         int horizontal_dist_;
         int vertical_dist_;
         HorizontalAlignment horizontal_alignment_;
         VerticalAlignment vertical_alignment_;
+        rclcpp::TimerBase::SharedPtr timer_;
 
         virtual void onInitialize() override;
         virtual void onEnable() override;
@@ -102,6 +107,7 @@ namespace rviz_2d_overlay_plugins {
         rviz_common::properties::IntProperty *width_property_;
         rviz_common::properties::IntProperty *height_property_;
         rviz_common::properties::IntProperty *text_size_property_;
+        rviz_common::properties::IntProperty *text_cache_size_property_;
         rviz_common::properties::IntProperty *line_width_property_;
         rviz_common::properties::ColorProperty *bg_color_property_;
         rviz_common::properties::FloatProperty *bg_alpha_property_;
@@ -122,6 +128,7 @@ namespace rviz_2d_overlay_plugins {
         void updateWidth();
         void updateHeight();
         void updateTextSize();
+        void updateTextCacheSize();
         void updateFGColor();
         void updateFGAlpha();
         void updateBGColor();

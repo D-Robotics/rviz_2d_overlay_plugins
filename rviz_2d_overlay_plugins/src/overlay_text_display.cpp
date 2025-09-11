@@ -58,8 +58,8 @@ namespace rviz_2d_overlay_plugins {
         fg_color_(255, 255, 255, 255.0),
         text_size_(14),
         line_width_(2),
-        text_(""),
         font_(""),
+        text_cache_size_(15),
         require_update_texture_(false) {
         overtake_position_properties_property_ = new rviz_common::properties::BoolProperty(
                 "Overtake Position Properties", false,
@@ -103,6 +103,10 @@ namespace rviz_2d_overlay_plugins {
         text_size_property_ =
                 new rviz_common::properties::IntProperty("text size", 12, "text size", this, SLOT(updateTextSize()));
         text_size_property_->setMin(0);
+        text_cache_size_property_ =
+                new rviz_common::properties::IntProperty("text cache size", 15, "text cache size",
+                    this, SLOT(updateTextCacheSize()));
+        text_cache_size_property_->setMin(5);
         line_width_property_ =
                 new rviz_common::properties::IntProperty("line width", 2, "line width", this, SLOT(updateLineWidth()));
         line_width_property_->setMin(0);
@@ -144,6 +148,10 @@ namespace rviz_2d_overlay_plugins {
             overlay_->hide();
         }
         unsubscribe();
+        {
+            auto lg = std::lock_guard<std::mutex>(text_cache_mutex_);
+            text_cache_.clear();
+        }
     }
 
     // only the first time
@@ -165,6 +173,7 @@ namespace rviz_2d_overlay_plugins {
         updateWidth();
         updateHeight();
         updateTextSize();
+        updateTextCacheSize();
         updateFGColor();
         updateFGAlpha();
         updateBGColor();
@@ -172,6 +181,14 @@ namespace rviz_2d_overlay_plugins {
         updateFont();
         updateLineWidth();
         require_update_texture_ = true;
+        
+        current_ts_ = rclcpp::Clock().now();
+        rclcpp::Node::SharedPtr node = rviz_ros_node_.lock()->get_raw_node();
+        timer_ = node->create_wall_timer(
+            std::chrono::milliseconds(1000), [this](){
+                current_ts_ = rviz_ros_node_.lock()->get_raw_node()->now();
+                require_update_texture_ = true;
+            });
     }
 
     void OverlayTextDisplay::update(float /*wall_dt*/, float /*ros_dt*/) {
@@ -203,8 +220,18 @@ namespace rviz_2d_overlay_plugins {
                 font.setBold(true);
                 painter.setFont(font);
             }
-            if (text_.length() > 0) {
-
+            
+            std::string text = "";
+            {
+              auto lg = std::lock_guard<std::mutex>(text_cache_mutex_);
+              for (auto citer = text_cache_.cbegin(); citer != text_cache_.cend(); citer++) {
+                text += *citer + "\n";
+              }
+            }
+            // Add timestamp
+            text += std::to_string(current_ts_.sec) + "." + std::to_string(current_ts_.nanosec) + "\n";
+            
+            if (text.length() > 0) {
                 QColor shadow_color;
                 if (invert_shadow_)
                     shadow_color = Qt::white; // fg_color_.lighter();
@@ -213,14 +240,13 @@ namespace rviz_2d_overlay_plugins {
                 shadow_color.setAlpha(fg_color_.alpha());
 
                 std::string color_wrapped_text =
-                        (boost::format("<span style=\"color: rgba(%2%, %3%, %4%, %5%)\">%1%</span>") % text_ %
-                         fg_color_.red() % fg_color_.green() % fg_color_.blue() % fg_color_.alpha())
-                                .str();
+                        (boost::format("<span style=\"color: rgba(%2%, %3%, %4%, %5%)\">%1%</span>") % text %
+                         fg_color_.red() % fg_color_.green() % fg_color_.blue() % fg_color_.alpha()).str();
 
                 // find a remove "color: XXX;" regex match to generate a proper shadow
                 std::regex color_tag_re("color:.+?;");
                 std::string null_char("");
-                std::string formatted_text_ = std::regex_replace(text_, color_tag_re, null_char);
+                std::string formatted_text_ = std::regex_replace(text, color_tag_re, null_char);
                 std::string color_wrapped_shadow =
                         (boost::format("<span style=\"color: rgba(%2%, %3%, %4%, %5%)\">%1%</span>") % formatted_text_ %
                          shadow_color.red() % shadow_color.green() % shadow_color.blue() % shadow_color.alpha())
@@ -261,6 +287,7 @@ namespace rviz_2d_overlay_plugins {
     }
 
     void OverlayTextDisplay::processMessage(rviz_2d_overlay_msgs::msg::OverlayText::ConstSharedPtr msg) {
+        // printf("\n %s:%d  msg->text: %s", __FILE__, __LINE__, msg->text.data());
         if (!isEnabled()) {
             return;
         }
@@ -280,12 +307,19 @@ namespace rviz_2d_overlay_plugins {
         }
 
         // store message for update method
-        text_ = msg->text;
+        {
+            auto lg = std::lock_guard<std::mutex>(text_cache_mutex_);
+            text_cache_.push_back(msg->text);
+            while (static_cast<int>(text_cache_.size()) > text_cache_size_) {
+              text_cache_.pop_front();
+            }
+        }
 
         if (!overtake_position_properties_) {
             texture_width_ = msg->width;
             texture_height_ = msg->height;
             text_size_ = msg->text_size;
+            text_cache_size_ = msg->text_cache_size;
             horizontal_dist_ = msg->horizontal_distance;
             vertical_dist_ = msg->vertical_distance;
 
@@ -317,6 +351,7 @@ namespace rviz_2d_overlay_plugins {
             updateWidth();
             updateHeight();
             updateTextSize();
+            updateTextCacheSize();
             require_update_texture_ = true;
         }
 
@@ -329,6 +364,7 @@ namespace rviz_2d_overlay_plugins {
             width_property_->show();
             height_property_->show();
             text_size_property_->show();
+            text_cache_size_property_->show();
         } else {
             hor_dist_property_->hide();
             ver_dist_property_->hide();
@@ -337,6 +373,7 @@ namespace rviz_2d_overlay_plugins {
             width_property_->hide();
             height_property_->hide();
             text_size_property_->hide();
+            text_cache_size_property_->hide();
         }
     }
 
@@ -440,6 +477,13 @@ namespace rviz_2d_overlay_plugins {
 
     void OverlayTextDisplay::updateTextSize() {
         text_size_ = text_size_property_->getInt();
+        if (overtake_position_properties_) {
+            require_update_texture_ = true;
+        }
+    }
+
+    void OverlayTextDisplay::updateTextCacheSize() {
+        text_cache_size_ = text_cache_size_property_->getInt();
         if (overtake_position_properties_) {
             require_update_texture_ = true;
         }
