@@ -148,7 +148,14 @@ void Rviz2dString::diagCallback(const diagnostic_msgs::msg::DiagnosticArray::Sha
   
   rviz_2d_overlay_msgs::msg::OverlayText ov_msg = ov_msg_;
   std::string text = "";
-  text += std::to_string(msg->header.stamp.sec) + "." + std::to_string(msg->header.stamp.nanosec);
+  // text += std::to_string(msg->header.stamp.sec) + "." + std::to_string(msg->header.stamp.nanosec);
+  text += std::to_string(msg->header.stamp.sec) + ".";
+  std::string str_ns = std::to_string(msg->header.stamp.nanosec);
+  for (int i = 0; i < 9 - str_ns.size(); i++) {
+    text += "0";
+  }
+  text += str_ns;
+
   for (const auto& status : msg->status) {
     text += " " + status.name + " " + status.message;
     for (const auto& key_value : status.values) {
