@@ -151,6 +151,7 @@ namespace rviz_2d_overlay_plugins {
         {
             auto lg = std::lock_guard<std::mutex>(text_cache_mutex_);
             text_cache_.clear();
+            text_lay_continuous_.clear();
         }
     }
 
@@ -227,6 +228,9 @@ namespace rviz_2d_overlay_plugins {
               for (auto citer = text_cache_.cbegin(); citer != text_cache_.cend(); citer++) {
                 text += *citer + "\n";
               }
+              if (!text_lay_continuous_.empty()) {
+                text += text_lay_continuous_ + "\n";
+              }
             }
             // Add timestamp
             text += std::to_string(current_ts_.sec) + "." + std::to_string(current_ts_.nanosec) + "\n";
@@ -287,7 +291,6 @@ namespace rviz_2d_overlay_plugins {
     }
 
     void OverlayTextDisplay::processMessage(rviz_2d_overlay_msgs::msg::OverlayText::ConstSharedPtr msg) {
-        // printf("\n %s:%d  msg->text: %s", __FILE__, __LINE__, msg->text.data());
         if (!isEnabled()) {
             return;
         }
@@ -309,9 +312,13 @@ namespace rviz_2d_overlay_plugins {
         // store message for update method
         {
             auto lg = std::lock_guard<std::mutex>(text_cache_mutex_);
-            text_cache_.push_back(msg->text);
-            while (static_cast<int>(text_cache_.size()) > text_cache_size_) {
+            if (msg->lay_type == rviz_2d_overlay_msgs::msg::OverlayText::LAY_CONTINUOUS) {
+              text_lay_continuous_ = msg->text;
+            } else {
+              text_cache_.push_back(msg->text);
+              while (static_cast<int>(text_cache_.size()) > text_cache_size_) {
               text_cache_.pop_front();
+              }
             }
         }
 

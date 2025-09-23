@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include "rclcpp/rclcpp.hpp"
 #include "rviz_2d_overlay_msgs/msg/overlay_text.hpp"
@@ -114,6 +115,10 @@ public:
         callback_handle_ = this->add_on_set_parameters_callback(std::bind(&Rviz2dString::parametersCallback, this, std::placeholders::_1));
         // RCLCPP_INFO_STREAM(this->get_logger(),
         //   "Node started: " << this->get_name() << " subscribed: " << string_topic << " publishing: " << overlay_text_topic << " ");
+
+        timer_ = this->create_wall_timer(
+          std::chrono::milliseconds(3000),
+          std::bind(&Rviz2dString::timerCallback, this));
     }
 
 private:
@@ -124,13 +129,16 @@ private:
 
     rclcpp::Subscription<std_msgs::msg::String>::SharedPtr sub_st_;
     std::string string_topic = "", overlay_text_topic, fg_color = "r";
-    rclcpp::Publisher<rviz_2d_overlay_msgs::msg::OverlayText>::SharedPtr pub_ov_;
+    rclcpp::Publisher<rviz_2d_overlay_msgs::msg::OverlayText>::SharedPtr pub_ov_ = nullptr;
     OnSetParametersCallbackHandle::SharedPtr callback_handle_;
     
     std::string diag_topic_name_ = "tros_diagnostics";
     rclcpp::Subscription<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diag_sub_ = nullptr;
     void diagCallback(const diagnostic_msgs::msg::DiagnosticArray::SharedPtr msg);
 
+    std::string getSystemStat();
+    rclcpp::TimerBase::SharedPtr timer_ = nullptr;
+    void timerCallback();
 };
 
 void Rviz2dString::strCallback(const std_msgs::msg::String &st_msg)
@@ -151,7 +159,7 @@ void Rviz2dString::diagCallback(const diagnostic_msgs::msg::DiagnosticArray::Sha
   // text += std::to_string(msg->header.stamp.sec) + "." + std::to_string(msg->header.stamp.nanosec);
   text += std::to_string(msg->header.stamp.sec) + ".";
   std::string str_ns = std::to_string(msg->header.stamp.nanosec);
-  for (int i = 0; i < 9 - str_ns.size(); i++) {
+  for (size_t i = 0; i < 9 - str_ns.size(); i++) {
     text += "0";
   }
   text += str_ns;
@@ -165,6 +173,87 @@ void Rviz2dString::diagCallback(const diagnostic_msgs::msg::DiagnosticArray::Sha
   
   RCLCPP_INFO(this->get_logger(), "Publishing: %s", text.c_str());
   ov_msg.text = text;
+  pub_ov_->publish(ov_msg);
+}
+
+std::string Rviz2dString::getSystemStat() {
+  auto get_sys_usage = [](std::string type, int column)->std::string{
+    char buffer[128] = {0};
+    // std::string cmd =
+    //     "ps -aux --sort=-%cpu | head -21 | tail -20 | awk '{sum += $3} END {print sum}'";
+    std::string cmd =
+        "ps -aux --sort=-%" + type +
+        " | head -21 | tail -20 | awk '{sum += $" + std::to_string(column) +
+        "} END {print sum}'";
+    FILE *fp = popen(cmd.c_str(), "r");
+    if (fp == nullptr) {
+      std::cerr << "can not popen top cmd" << std::endl;
+      return "";
+    }
+    int ret = fread(buffer, sizeof(char), sizeof(buffer), fp);
+    if (ret <= 0) {
+      std::cerr << "can not read top cmd result" << std::endl;
+      return "";
+    }
+    pclose(fp);
+
+    std::string usage = std::string(buffer);
+    usage.erase(std::remove(usage.begin(), usage.end(), '\n'), usage.end());
+    return usage;
+  };
+
+  std::string cpu_usage = get_sys_usage("cpu", 3);
+  std::string mem_usage = get_sys_usage("mem", 4);
+  // {
+  //   float cpu_usage_f = std::stof(cpu_usage);
+  //   if (cpu_usage_f > 1000.0f) {
+  //     RCLCPP_ERROR(
+  //       get_logger(),
+  //       "CPU usage is invalid: %s", cpu_usage.c_str());
+  //   }
+  // }
+  std::string bpu_usage;
+  {
+    std::stringstream temp;
+    std::ifstream bpu_ratio(
+        "/sys/devices/system/bpu/bpu0/ratio", std::ios::in);
+    if (bpu_ratio.is_open()) {
+      temp << bpu_ratio.rdbuf();
+    } else {
+      temp << "0\n";
+    }
+    bpu_usage = temp.str();
+    bpu_usage.erase(std::remove(bpu_usage.begin(), bpu_usage.end(), '\n'), bpu_usage.end());
+  }
+
+  RCLCPP_INFO(this->get_logger(),
+    "sys usage" \
+    "\n cpu: %s" \
+    "\n mem: %s" \
+    "\n bpu: %s",
+    cpu_usage.data(),
+    mem_usage.data(),
+    bpu_usage.data()
+  );
+
+  return "| cpu " + cpu_usage + " | mem " + mem_usage + " % | bpu " + bpu_usage + " % |";
+}
+void Rviz2dString::timerCallback() {
+  if (!pub_ov_) return;
+
+  rviz_2d_overlay_msgs::msg::OverlayText ov_msg = ov_msg_;
+  std::string text = "";
+  builtin_interfaces::msg::Time stamp = this->now();
+  text += std::to_string(stamp.sec) + ".";
+  std::string str_ns = std::to_string(stamp.nanosec);
+  for (size_t i = 0; i < 9 - str_ns.size(); i++) {
+    text += "0";
+  }
+  text += str_ns;
+  text += " " + getSystemStat();
+  RCLCPP_INFO(this->get_logger(), "Publishing: %s", text.c_str());
+  ov_msg.text = text;
+  ov_msg.lay_type = rviz_2d_overlay_msgs::msg::OverlayText::LAY_CONTINUOUS;
   pub_ov_->publish(ov_msg);
 }
 

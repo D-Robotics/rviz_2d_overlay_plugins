@@ -8,6 +8,14 @@ uint8 CENTER = 2
 uint8 TOP = 3
 uint8 BOTTOM = 4
 
+# constants for lay_type
+#  sequential: texts are shown in the order they are received
+#  once: texts are shown once
+#  continuous: text is shown continuously and as the lastest received
+uint8 LAY_SEQUENTIAL = 0
+uint8 LAY_ONCE = 1
+uint8 LAY_CONTINUOUS = 2
+
 uint8 action
 
 int32 width
@@ -20,6 +28,9 @@ int32 vertical_distance # Vertical distance between from top/bottom border or ce
 # Alignment of the overlay withing RVIZ
 uint8 horizontal_alignment # one of LEFT, CENTER, RIGHT
 uint8 vertical_alignment # one of TOP, CENTER, BOTTOM
+
+# lay type of text
+uint8 lay_type
 
 std_msgs/ColorRGBA bg_color
 
