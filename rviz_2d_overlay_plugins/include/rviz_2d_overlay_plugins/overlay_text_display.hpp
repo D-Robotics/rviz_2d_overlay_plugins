@@ -65,23 +65,24 @@ namespace rviz_2d_overlay_plugins {
 
         int texture_width_;
         int texture_height_;
+        QColor bg_color_;
+        QColor fg_color_;
+        int text_size_;
+        int line_width_;
+        std::string font_;
+        int text_cache_size_ = 15;
+        std::atomic<bool> require_update_texture_;
 
         bool overtake_fg_color_properties_;
         bool overtake_bg_color_properties_;
         bool overtake_position_properties_;
         bool align_bottom_;
         bool invert_shadow_;
-        QColor bg_color_;
-        QColor fg_color_;
-        int text_size_;
-        int line_width_;
         std::mutex text_cache_mutex_;
-        int text_cache_size_ = 15;
         std::list<std::string> text_cache_;
         builtin_interfaces::msg::Time current_ts_;
         std::string text_lay_continuous_ = "";
         QStringList font_families_;
-        std::string font_;
         int horizontal_dist_;
         int vertical_dist_;
         HorizontalAlignment horizontal_alignment_;
@@ -94,7 +95,6 @@ namespace rviz_2d_overlay_plugins {
         virtual void update(float wall_dt, float ros_dt) override;
         virtual void reset() override;
 
-        bool require_update_texture_;
         // properties are raw pointers since they are owned by Qt
         rviz_common::properties::BoolProperty *overtake_position_properties_property_;
         rviz_common::properties::BoolProperty *overtake_fg_color_properties_property_;

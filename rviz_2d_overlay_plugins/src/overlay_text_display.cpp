@@ -183,12 +183,18 @@ namespace rviz_2d_overlay_plugins {
         updateLineWidth();
         require_update_texture_ = true;
         
-        current_ts_ = rclcpp::Clock().now();
+        {
+            auto lg = std::lock_guard<std::mutex>(text_cache_mutex_);
+            current_ts_ = rviz_ros_node_.lock()->get_raw_node()->now();
+        }
         rclcpp::Node::SharedPtr node = rviz_ros_node_.lock()->get_raw_node();
         timer_ = node->create_wall_timer(
             std::chrono::milliseconds(1000), [this](){
-                current_ts_ = rviz_ros_node_.lock()->get_raw_node()->now();
                 require_update_texture_ = true;
+                {
+                    auto lg = std::lock_guard<std::mutex>(text_cache_mutex_);
+                    current_ts_ = rviz_ros_node_.lock()->get_raw_node()->now();
+                }
             });
     }
 
@@ -233,7 +239,10 @@ namespace rviz_2d_overlay_plugins {
               }
             }
             // Add timestamp
-            text += std::to_string(current_ts_.sec) + "." + std::to_string(current_ts_.nanosec) + "\n";
+            {
+                auto lg = std::lock_guard<std::mutex>(text_cache_mutex_);
+                text += std::to_string(current_ts_.sec) + "." + std::to_string(current_ts_.nanosec) + "\n";
+            }
             
             if (text.length() > 0) {
                 QColor shadow_color;
@@ -269,9 +278,10 @@ namespace rviz_2d_overlay_plugins {
                     painter.drawStaticText(0, 0, static_text);
                 } else {
                     QStaticText only_wrapped_text(color_wrapped_text.c_str());
+                    QString splited_text = only_wrapped_text.text().remove(QRegExp("<[^>]*>"));
                     QFontMetrics fm(painter.fontMetrics());
                     QRect text_rect = fm.boundingRect(0, 0, w, h, Qt::TextWordWrap | Qt::AlignLeft | Qt::AlignTop,
-                                                      only_wrapped_text.text().remove(QRegExp("<[^>]*>")));
+                                                      splited_text);
                     painter.drawStaticText(1, h - text_rect.height() + 1, static_shadow);
                     painter.drawStaticText(0, h - text_rect.height(), static_text);
                 }
