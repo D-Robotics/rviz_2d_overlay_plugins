@@ -154,7 +154,6 @@ void Rviz2dString::diagCallback(const diagnostic_msgs::msg::DiagnosticArray::Sha
     "Recved diagnostics from topic %s, this msg appears only once",
     diag_topic_name_.c_str());
   
-  rviz_2d_overlay_msgs::msg::OverlayText ov_msg = ov_msg_;
   std::string text = "";
   // text += std::to_string(msg->header.stamp.sec) + "." + std::to_string(msg->header.stamp.nanosec);
   text += std::to_string(msg->header.stamp.sec) + ".";
@@ -165,15 +164,29 @@ void Rviz2dString::diagCallback(const diagnostic_msgs::msg::DiagnosticArray::Sha
   text += str_ns;
 
   for (const auto& status : msg->status) {
-    text += " " + status.name + " " + status.message;
-    for (const auto& key_value : status.values) {
-      text += " " + key_value.key + ": [" + key_value.value + "]";
+    std::string pub_text = text;
+    rviz_2d_overlay_msgs::msg::OverlayText ov_msg = ov_msg_;
+    ov_msg.id = status.hardware_id;
+    if (status.name == "LAY_CONTINUOUS") {
+      pub_text += " " + status.message;
+      for (const auto& key_value : status.values) {
+        pub_text += " " + key_value.key + ": [" + key_value.value + "]";
+      }
+      
+      RCLCPP_INFO(this->get_logger(), "Publishing: %s", pub_text.c_str());
+      ov_msg.text = pub_text;
+      ov_msg.lay_type = rviz_2d_overlay_msgs::msg::OverlayText::LAY_CONTINUOUS;
+    } else {
+      pub_text += " " + status.name + " " + status.message;
+      for (const auto& key_value : status.values) {
+        pub_text += " " + key_value.key + ": [" + key_value.value + "]";
+      }
+      
+      RCLCPP_INFO(this->get_logger(), "Publishing: %s", pub_text.c_str());
+      ov_msg.text = pub_text;
     }
+    pub_ov_->publish(ov_msg);
   }
-  
-  RCLCPP_INFO(this->get_logger(), "Publishing: %s", text.c_str());
-  ov_msg.text = text;
-  pub_ov_->publish(ov_msg);
 }
 
 std::string Rviz2dString::getSystemStat() {

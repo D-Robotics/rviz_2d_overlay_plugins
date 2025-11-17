@@ -152,6 +152,7 @@ namespace rviz_2d_overlay_plugins {
             auto lg = std::lock_guard<std::mutex>(text_cache_mutex_);
             text_cache_.clear();
             text_lay_continuous_.clear();
+            texts_lay_continuous_.clear();
         }
     }
 
@@ -234,6 +235,13 @@ namespace rviz_2d_overlay_plugins {
               for (auto citer = text_cache_.cbegin(); citer != text_cache_.cend(); citer++) {
                 text += *citer + "\n";
               }
+
+              for (const auto &text_lay_continuous : texts_lay_continuous_) {
+                if (!text_lay_continuous.second.empty()) {
+                  text += text_lay_continuous.second + "\n";
+                }
+              }
+
               if (!text_lay_continuous_.empty()) {
                 text += text_lay_continuous_ + "\n";
               }
@@ -323,7 +331,11 @@ namespace rviz_2d_overlay_plugins {
         {
             auto lg = std::lock_guard<std::mutex>(text_cache_mutex_);
             if (msg->lay_type == rviz_2d_overlay_msgs::msg::OverlayText::LAY_CONTINUOUS) {
-              text_lay_continuous_ = msg->text;
+              if (msg->id.empty()) {
+                text_lay_continuous_ = msg->text;
+              } else {
+                texts_lay_continuous_[msg->id] = msg->text;
+              }
             } else {
               text_cache_.push_back(msg->text);
               while (static_cast<int>(text_cache_.size()) > text_cache_size_) {

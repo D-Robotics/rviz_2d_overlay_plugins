@@ -82,6 +82,7 @@ namespace rviz_2d_overlay_plugins {
         std::list<std::string> text_cache_;
         builtin_interfaces::msg::Time current_ts_;
         std::string text_lay_continuous_ = "";
+        std::map<std::string, std::string> texts_lay_continuous_;
         QStringList font_families_;
         int horizontal_dist_;
         int vertical_dist_;

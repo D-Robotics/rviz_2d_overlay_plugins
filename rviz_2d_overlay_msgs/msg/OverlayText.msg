@@ -40,4 +40,5 @@ string font
 std_msgs/ColorRGBA fg_color
 float32 text_cache_size
 
+string id
 string text
