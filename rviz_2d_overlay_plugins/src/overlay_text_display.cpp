@@ -106,7 +106,7 @@ namespace rviz_2d_overlay_plugins {
         text_cache_size_property_ =
                 new rviz_common::properties::IntProperty("text cache size", 15, "text cache size",
                     this, SLOT(updateTextCacheSize()));
-        text_cache_size_property_->setMin(5);
+        text_cache_size_property_->setMin(1);
         line_width_property_ =
                 new rviz_common::properties::IntProperty("line width", 2, "line width", this, SLOT(updateLineWidth()));
         line_width_property_->setMin(0);
