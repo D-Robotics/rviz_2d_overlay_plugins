@@ -170,7 +170,7 @@ void Rviz2dString::diagCallback(const diagnostic_msgs::msg::DiagnosticArray::Sha
     if (status.name == "LAY_CONTINUOUS") {
       pub_text += " " + status.message;
       for (const auto& key_value : status.values) {
-        pub_text += " " + key_value.key + ": [" + key_value.value + "]";
+        pub_text += " " + key_value.key + " [" + key_value.value + "]";
       }
       
       RCLCPP_INFO(this->get_logger(), "Publishing: %s", pub_text.c_str());
